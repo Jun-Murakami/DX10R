@@ -1,0 +1,31 @@
+# Version management for DX10R
+# Reads the canonical version string from the top-level VERSION file and exposes
+# the SemVer triple + full version (with optional -suffix) to the CMake project.
+
+file(READ "${CMAKE_SOURCE_DIR}/VERSION" DX10R_VERSION_STRING)
+string(STRIP "${DX10R_VERSION_STRING}" DX10R_VERSION_STRING)
+
+string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-(.+))?$" VERSION_MATCH "${DX10R_VERSION_STRING}")
+
+if(VERSION_MATCH)
+    set(DX10R_VERSION_MAJOR ${CMAKE_MATCH_1})
+    set(DX10R_VERSION_MINOR ${CMAKE_MATCH_2})
+    set(DX10R_VERSION_PATCH ${CMAKE_MATCH_3})
+
+    if(CMAKE_MATCH_5)
+        set(DX10R_VERSION_SUFFIX ${CMAKE_MATCH_5})
+        set(DX10R_VERSION_FULL "${DX10R_VERSION_MAJOR}.${DX10R_VERSION_MINOR}.${DX10R_VERSION_PATCH}-${DX10R_VERSION_SUFFIX}")
+    else()
+        set(DX10R_VERSION_SUFFIX "")
+        set(DX10R_VERSION_FULL "${DX10R_VERSION_MAJOR}.${DX10R_VERSION_MINOR}.${DX10R_VERSION_PATCH}")
+    endif()
+else()
+    message(FATAL_ERROR "Invalid version format in VERSION file: ${DX10R_VERSION_STRING}")
+endif()
+
+set(PROJECT_VERSION "${DX10R_VERSION_MAJOR}.${DX10R_VERSION_MINOR}.${DX10R_VERSION_PATCH}")
+set(PROJECT_VERSION_MAJOR ${DX10R_VERSION_MAJOR})
+set(PROJECT_VERSION_MINOR ${DX10R_VERSION_MINOR})
+set(PROJECT_VERSION_PATCH ${DX10R_VERSION_PATCH})
+
+message(STATUS "DX10R Version: ${DX10R_VERSION_FULL}")

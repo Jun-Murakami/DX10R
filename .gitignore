@@ -1,0 +1,73 @@
+# Build directories
+/build
+/build-*/
+
+# iPlug2 framework: tracked as a git submodule (see .gitmodules).
+# AAX_SDK / VST3_SDK / CLAP_SDK / WAM_SDK live under iPlug2/Dependencies/IPlug/
+# and are governed by iPlug2's own .gitignore — NOT redistributed in this repo.
+
+# Original mda DX10 source (reference only — GPL/MIT, not redistributed here)
+/docs/mda_DX10_src/
+
+# WebUI build output (embedded in the bundle, regenerated on every build)
+/plugin/resources/web/
+
+# Release packages
+/releases/
+
+# Node modules
+/webui/node_modules/
+/webui/dist/
+/webui/dist-web/
+/webui/.vite/
+/webui/coverage/
+
+# WASM (Emscripten) build output + generated wasm artifact
+/wasm/build/
+/webui/public-web/wasm/*.wasm
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Build artifacts
+*.dll
+*.exe
+*.dylib
+*.so
+*.vst3
+*.vst
+*.au
+*.aax
+*.component
+*.wav
+
+# Development only
+.claude/
+.serena/
+.cursor/
+.mcp.json
+*.pdf
+scratch/
+
+# Logs / caches
+*.tmp
+*.log
+*.cache
+
+# Playwright artefacts (used by playwright-cli for UI debugging)
+.playwright-cli/
+/dev-*.png
+/webui/.playwright-cli/
+/webui/dev-*.png
+
+# Code signing
+dx10r-dev.pfx
+*.pfx
+.env
+.env*

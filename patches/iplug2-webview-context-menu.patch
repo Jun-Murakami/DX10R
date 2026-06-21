@@ -1,0 +1,65 @@
+diff --git a/IPlug/Extras/WebView/IPlugWKWebView.h b/IPlug/Extras/WebView/IPlugWKWebView.h
+--- a/IPlug/Extras/WebView/IPlugWKWebView.h
++++ b/IPlug/Extras/WebView/IPlugWKWebView.h
+@@ -32,10 +32,12 @@
+ {
+   bool mEnableInteraction;
++  bool mEnableContextMenu;
+ }
+ 
+ - (instancetype)initWithFrame:(CGRect)frame configuration:(WKWebViewConfiguration *)configuration;
+ 
+ - (void)setEnableInteraction:(bool)enable;
++- (void)setEnableContextMenu:(bool)enable;
+ 
+ #ifdef OS_MAC
+ - (NSView *)hitTest:(NSPoint)point;
+diff --git a/IPlug/Extras/WebView/IPlugWKWebView.mm b/IPlug/Extras/WebView/IPlugWKWebView.mm
+--- a/IPlug/Extras/WebView/IPlugWKWebView.mm
++++ b/IPlug/Extras/WebView/IPlugWKWebView.mm
+@@ -36,6 +36,7 @@
+   if (self)
+   {
+     mEnableInteraction = true;
++    mEnableContextMenu = true;
+   }
+   return self;
+ }
+@@ -55,6 +56,12 @@
+ {
+   [super willOpenMenu:menu withEvent:event];
+   
++  if (!mEnableContextMenu)
++  {
++    [menu removeAllItems];
++    return;
++  }
++
+   NSArray<NSString *> *WKStrings = @[
+    @"WKMenuItemIdentifierCopy",
+    @"WKMenuItemIdentifierCopyImage",
+@@ -91,6 +98,11 @@
+ 
+ #endif
+ 
++- (void)setEnableContextMenu:(bool)enable
++{
++  mEnableContextMenu = enable;
++}
++
+ - (void)setEnableInteraction:(bool)enable
+ {
+   mEnableInteraction = enable;
+diff --git a/IPlug/Extras/WebView/IPlugWebView_mac.mm b/IPlug/Extras/WebView/IPlugWebView_mac.mm
+--- a/IPlug/Extras/WebView/IPlugWebView_mac.mm
++++ b/IPlug/Extras/WebView/IPlugWebView_mac.mm
+@@ -146,6 +146,9 @@ void* IWebViewImpl::OpenWebView(void* pParent, float x, float y, float w, float
+   
+   IPLUG_WKWEBVIEW* wkWebView = [[IPLUG_WKWEBVIEW alloc] initWithFrame: CGRectMake(x, y, w, h) configuration:webConfig];
+   
++  // Keep the native context menu available only when developer tools are enabled.
++  [wkWebView setEnableContextMenu:mIWebView->GetEnableDevTools()];
++
+   const auto isTransparent = !mIWebView->IsOpaque();
+ 
+ #if defined OS_IOS

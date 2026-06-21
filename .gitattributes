@@ -1,0 +1,15 @@
+# Enforce LF line endings for every text file, in both the repository and the
+# working tree (`eol=lf`). `text=auto` keeps git's binary auto-detection so
+# binary blobs are left untouched; the explicit `binary` rules below are an
+# extra safeguard for the binary types tracked in this repo. This applies
+# repo-wide, including docs/.
+* text=auto eol=lf
+
+# Binary assets: never normalize line endings.
+*.png  binary
+*.jpg  binary
+*.bmp  binary
+*.ico  binary
+*.icns binary
+*.mid  binary
+*.webm binary
