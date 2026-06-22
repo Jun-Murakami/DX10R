@@ -2,14 +2,21 @@
 #include "IPlug_include_in_plug_src.h"
 
 #include "ParamSpecs.h"
+#include "PresetFileDialog.h"
+#include "SystemClipboard.h"
 #include "resource.h"
 
 #include <array>
+#include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 #if defined(_WIN32)
 #include <windows.h>
+#include <shlobj.h> // SHGetFolderPathW / CSIDL_PERSONAL (Documents)
 #endif
 
 // File-scope anchor so GetModuleHandleEx can resolve THIS module (the plugin
@@ -302,7 +309,36 @@ void DX10R::HandleMidiMsg(const IMidiMsg& msg)
 
 bool DX10R::OnMessage(int msgTag, int ctrlTag, int dataSize, const void* pData)
 {
-  return false;
+  // WebUI -> C++ arbitrary messages (SAMFUI). UI thread only — file dialogs /
+  // file I/O / clipboard are safe here, never from ProcessBlock.
+  switch (msgTag)
+  {
+    case kMsgSavePreset:
+      handleSavePreset();
+      return true;
+
+    case kMsgLoadPreset:
+      handleLoadPreset();
+      return true;
+
+    case kMsgClipboardWrite:
+    {
+      const std::string text(static_cast<const char*>(pData), static_cast<size_t>(dataSize));
+      dx10::SetSystemClipboardText(text);
+      return true;
+    }
+
+    case kMsgClipboardRead:
+    {
+      std::string text;
+      dx10::GetSystemClipboardText(text);
+      SendArbitraryMsgFromDelegate(kMsgClipboardReadResult, static_cast<int>(text.size()), text.data());
+      return true;
+    }
+
+    default:
+      return false;
+  }
 }
 
 void DX10R::OnParamChange(int paramIdx)
@@ -352,6 +388,122 @@ void DX10R::applyEffectParamChange(int paramIdx)
   {
     // off 1..8 → effect param 0..7 (generic 0..1).
     mEffectsRack.setSlotParam(slot, off - 1, GetParam(paramIdx)->Value());
+  }
+}
+
+// ---------------------------------------------------------------------------
+// User preset save/load (.dx10p flat JSON). UI thread only (via OnMessage).
+// ---------------------------------------------------------------------------
+namespace {
+
+// <Documents>/DX10R, created if missing. Empty path on failure.
+std::filesystem::path GetPresetsDir()
+{
+  namespace fs = std::filesystem;
+  fs::path docs;
+#if defined(_WIN32)
+  wchar_t buf[MAX_PATH];
+  if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_PERSONAL, nullptr, 0, buf)))
+    docs = fs::path(buf);
+  if (docs.empty())
+    if (const char* up = std::getenv("USERPROFILE")) docs = fs::path(up) / "Documents";
+#else
+  if (const char* home = std::getenv("HOME")) docs = fs::path(home) / "Documents";
+#endif
+  if (docs.empty()) return {};
+  fs::path dir = docs / "DX10R";
+  std::error_code ec;
+  fs::create_directories(dir, ec);
+  return dir;
+}
+
+} // namespace
+
+void DX10R::handleSavePreset()
+{
+  std::filesystem::path path;
+  if (!dx10::preset::PromptForPresetFile(mNativeParent, dx10::preset::FileDialogAction::Save,
+                                         GetPresetsDir(), "MyPreset.dx10p", path))
+    return;
+
+  // Flat JSON of every param's normalized value: {"0": v, ..., "68": v}
+  // (same shape as the factory docs/presets/*.dx10p, but the full 0..68 set).
+  std::string json = "{\n";
+  for (int i = 0; i < kNumParams; ++i)
+  {
+    char line[64];
+    std::snprintf(line, sizeof(line), "  \"%d\": %.6g%s\n", i, GetParam(i)->GetNormalized(),
+                  (i + 1 < kNumParams) ? "," : "");
+    json += line;
+  }
+  json += "}\n";
+
+  std::ofstream ofs(path, std::ios::binary);
+  if (ofs) ofs << json;
+}
+
+void DX10R::handleLoadPreset()
+{
+  std::filesystem::path path;
+  if (!dx10::preset::PromptForPresetFile(mNativeParent, dx10::preset::FileDialogAction::Open,
+                                         GetPresetsDir(), "", path))
+    return;
+
+  std::ifstream ifs(path, std::ios::binary);
+  if (!ifs) return;
+  const std::string text((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  applyPresetJson(text);
+}
+
+void DX10R::applyPresetJson(const std::string& json)
+{
+  // Hand-parse the flat {"<idx>": <number>} map (our own format; no JSON lib).
+  std::array<double, kNumParams> parsed{};
+  std::array<bool, kNumParams> present{};
+  const char* s = json.c_str();
+  while (*s)
+  {
+    if (*s != '"') { ++s; continue; }
+    const char* k = s + 1;
+    int idx = 0;
+    bool digits = false;
+    while (*k >= '0' && *k <= '9') { idx = idx * 10 + (*k - '0'); ++k; digits = true; }
+    if (!digits || *k != '"') { s = k; continue; }
+    const char* c = k + 1;
+    while (*c == ' ' || *c == '\t') ++c;
+    if (*c != ':') { s = c; continue; }
+    ++c;
+    while (*c == ' ' || *c == '\t') ++c;
+    char* endp = nullptr;
+    const double v = std::strtod(c, &endp);
+    if (endp != c && idx >= 0 && idx < kNumParams)
+    {
+      parsed[static_cast<size_t>(idx)] = v;
+      present[static_cast<size_t>(idx)] = true;
+    }
+    s = (endp && endp > c) ? endp : c;
+  }
+
+  // Effect Chain Lock: when ON, a loaded patch must NOT overwrite the effect
+  // slot params (18..67) so the user can swap the tone but keep their chain. The
+  // lock (idx 68) and the FM/master params (0..17) always load.
+  const bool chainLocked = GetParam(kFxChainLock)->Bool();
+
+  // Pass 1: set IParam values first (so an effect Type re-apply, which reads its
+  // slot's 8 generic Values, sees consistent state).
+  for (int i = 0; i < kNumParams; ++i)
+  {
+    if (!present[static_cast<size_t>(i)]) continue;
+    if (chainLocked && dx10::fx::isSlotParam(i)) continue;
+    GetParam(i)->SetNormalized(parsed[static_cast<size_t>(i)]);
+  }
+  // Pass 2: update the DSP engine + push the new value to the WebUI (SPVFD).
+  for (int i = 0; i < kNumParams; ++i)
+  {
+    if (!present[static_cast<size_t>(i)]) continue;
+    if (chainLocked && dx10::fx::isSlotParam(i)) continue;
+    OnParamChange(i);
+    SendParameterValueFromDelegate(i, GetParam(i)->GetNormalized(), true);
   }
 }
 

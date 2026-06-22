@@ -85,10 +85,14 @@ mda DX10（2-op FM, OSS）を iPlug2 + WebView で現代風にリファインす
 - [x] `scripts/gen-factory-presets.mjs`: mda ソースの `fillpatch(...)` を直接パースし、原典 16 値 → DX10R 18 param（Sustain=0 挿入 / Volume=0dB 正規化）へマッピング。**32 個の `.dx10p`**（`docs/presets/`、SOT、flat JSON）+ `webui/src/factory-presets.ts`（順序付きテーブル）を生成。
 - [x] WebUI `components/PresetBar.tsx`（prev / dropdown / next）をヘッダに配置。選択で 18 param を `setManyFromUI` で一括ロード（C++ へ SPVFUI 送信）。typecheck/build green。`LoadIndexHtml(__FILE__)` 経由なのでプラグイン再ビルド不要（リロードで反映）。
 
-**Phase 3b 残（ユーザープリセット & 配布埋め込み）:**
-- [ ] ユーザー `.dx10p` の save/load（Synth80 `PresetFileDialog_win.cpp`/`_mac.mm` 移植 + WebUI↔C++ メッセージ）。保存=現 18 param→ファイル、読込=ファイル→param + SPVFD。
-- [ ] 配布用にファクトリを C++ 埋め込み（`FactoryPresetsEmbedded.h`、CMake glob）+ iPlug2 native preset（host メニュー）連携は任意。
-- [ ] `SerializeState`/`OnRestoreState`（現状 iPlug2 が IParam 値を自動保存。bank 状態が要るなら拡張）
+**Phase 3b 完了（ユーザープリセット & メッセージ基盤）:**
+- [x] **WebUI↔C++ 任意メッセージ基盤**（`SAMFUI`/`SAMFD`、base64）。`bridge/iplug-bridge.ts` に `sendArbitraryMsg`/`handleSamfd`、`ParameterIDs.h` に `EArbitraryMsgTags`、`DX10R.cpp` `OnMessage` dispatch。
+- [x] **ユーザー `.dx10p` save/load**（ネイティブダイアログ、`PresetFileDialog.{h,_win.cpp,_mac.mm}` を `dx10::preset` に移植）。保存=全 69 param の `GetNormalized()`→flat JSON（factory と同形式、`<Documents>/DX10R`）。読込=parse→2 pass(SetNormalized 全 → OnParamChange + SendParameterValueFromDelegate→SPVFD で UI 反映)。**EFFECT LOCK で effect param(18..67) のロードを gate**（音色だけ差替え）。PresetBar に Save/Load ボタン。
+- [x] **エフェクト Copy/Paste を OS クリップボード化**（`SystemClipboard.{h,_win,_mac}` 移植 + ClipboardRead/Write/Result メッセージ）。null-origin WebView の制約を解消。
+- 配布用ファクトリ: DX10R は factory を webui バンドル(`factory-presets.ts`)に内包＝配布済み（Synth80 の `FactoryPresetsEmbedded.h` フォルダ seed 方式は不要）。DAW プロジェクト保存は iPlug2 が IParam 値を自動永続化。
+- 残: 実機での save/load・クリップボード対話確認（ヘッドレス不可）/ フォルダ列挙のプリセットブラウザ（任意）。
+
+**Phase 3 完了。** ファクトリ + ユーザープリセット + チェーンロック + クリップボード。
 
 ## Phase 4 — エフェクトチェーン移植
 

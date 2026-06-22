@@ -1,6 +1,7 @@
 import { Box, IconButton, MenuItem, Select } from '@mui/material'
 import { useState } from 'react'
 
+import { iplugAPI } from '../bridge/iplug-bridge'
 import { FACTORY_PRESETS } from '../factory-presets'
 import { useParamStore } from '../store/paramStore'
 
@@ -60,6 +61,41 @@ export function PresetBar() {
       >
         ›
       </IconButton>
+
+      {/* User preset file save / load (native dialog via C++; .dx10p). */}
+      <Box
+        component="button"
+        type="button"
+        onClick={() => iplugAPI.savePreset()}
+        sx={presetButtonSx}
+      >
+        Save
+      </Box>
+      <Box
+        component="button"
+        type="button"
+        onClick={() => iplugAPI.loadPreset()}
+        sx={presetButtonSx}
+      >
+        Load
+      </Box>
     </Box>
   )
 }
+
+const presetButtonSx = {
+  appearance: 'none',
+  border: '1px solid #404040',
+  borderRadius: 1,
+  bgcolor: 'background.paper',
+  color: 'text.secondary',
+  fontSize: '0.72rem',
+  fontWeight: 600,
+  lineHeight: 1,
+  px: 0.75,
+  py: 0.4,
+  ml: 0.25,
+  cursor: 'pointer',
+  transition: 'color 120ms ease, border-color 120ms ease',
+  '&:hover': { color: 'primary.main', borderColor: 'primary.main' },
+} as const

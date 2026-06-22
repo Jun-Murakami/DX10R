@@ -18,6 +18,7 @@ import { Box, Menu, MenuItem, Tooltip, Typography } from '@mui/material'
 import { Fragment, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { iplugAPI } from '../bridge/iplug-bridge'
 import { EFFECT_TYPE_DEFS, getEffectTypeMeta } from '../dx10r-effects'
 import {
   effectChainToJson,
@@ -418,20 +419,29 @@ function EffectChainClipboardButtons() {
   const handleCopy = async () => {
     const json = effectChainToJson(useParamStore.getState().values)
     sessionClipboard = json
-    try {
-      if (navigator?.clipboard) await navigator.clipboard.writeText(json)
-    } catch {
-      // null-origin plugin WebView: session buffer already holds it.
+    if (iplugAPI.hasHostBridge()) {
+      // Plugin WebView (null-origin): route through C++ to the real OS clipboard.
+      iplugAPI.clipboardWrite(json)
+    } else {
+      try {
+        if (navigator?.clipboard) await navigator.clipboard.writeText(json)
+      } catch {
+        // browser dev without clipboard permission: session buffer holds it.
+      }
     }
     flash('copied')
   }
 
   const handlePaste = async () => {
     let text: string | null = null
-    try {
-      if (navigator?.clipboard) text = await navigator.clipboard.readText()
-    } catch {
-      // fall through to session buffer
+    if (iplugAPI.hasHostBridge()) {
+      text = await iplugAPI.clipboardRead()
+    } else {
+      try {
+        if (navigator?.clipboard) text = await navigator.clipboard.readText()
+      } catch {
+        // fall through to session buffer
+      }
     }
     if (!text) text = sessionClipboard
     if (!text) return

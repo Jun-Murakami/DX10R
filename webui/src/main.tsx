@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import App from './App'
+import { handleSamfd } from './bridge/iplug-bridge'
 import { installDevMockIfStandalone } from './dev-mock'
 import { defaultNormMap } from './dx10r-params'
 import { useParamStore } from './store/paramStore'
@@ -18,7 +19,10 @@ window.SPVFD = (paramIdx, normalizedValue) => {
 // EvaluateJavaScript calls never hit "undefined is not a function".
 window.SCVFD = () => {}
 window.SCMFD = () => {}
-window.SAMFD = () => {}
+// Arbitrary C++ → JS messages (clipboard-read result, etc.).
+window.SAMFD = (msgTag: number, dataSize: number, base64: string) => {
+  handleSamfd(msgTag, dataSize, base64)
+}
 window.SMMFD = () => {}
 
 const root = document.getElementById('root')

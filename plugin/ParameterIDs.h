@@ -55,6 +55,17 @@ enum EParams
   kNumParams
 };
 
+// Arbitrary WebUI <-> C++ message tags (SAMFUI/SAMFD payloads). Values MUST stay
+// in sync with MSG_TAG in webui/src/bridge/iplug-bridge.ts.
+enum EArbitraryMsgTags
+{
+  kMsgSavePreset = 0,      // JS -> C++: open native Save dialog, write current state
+  kMsgLoadPreset,          // JS -> C++: open native Open dialog, load + apply a .dx10p
+  kMsgClipboardWrite,      // JS -> C++: write payload text to the OS clipboard
+  kMsgClipboardRead,       // JS -> C++: read OS clipboard, reply via kMsgClipboardReadResult
+  kMsgClipboardReadResult, // C++ -> JS: clipboard text (SAMFD)
+};
+
 namespace dx10 {
 // Effect-chain parameter layout helpers (5 slots × 10 contiguous params).
 namespace fx {

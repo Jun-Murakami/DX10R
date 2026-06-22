@@ -11,6 +11,8 @@
 #include "dsp/VoiceManager.h"
 #include "dsp/effects/EffectsRack.h"
 
+#include <string>
+
 using namespace iplug;
 
 class DX10R final : public Plugin
@@ -39,6 +41,11 @@ private:
   void HandleMidiMsg(const IMidiMsg& msg);
   // Dispatch an effect-chain IParam change (Type / generic / Bypass) to the rack.
   void applyEffectParamChange(int paramIdx);
+  // User preset save/load (.dx10p flat JSON). UI-thread only (via OnMessage):
+  // native file dialogs + file I/O are not real-time safe.
+  void handleSavePreset();
+  void handleLoadPreset();
+  void applyPresetJson(const std::string& json);
 #if defined(OS_WIN) && defined(AAX_API)
   // Pro Tools / AAX views are 100% DPI physical px; pre-divide the bounds so
   // iPlug2's internal GetScaleForHWND() multiplication lands on the PT view size.

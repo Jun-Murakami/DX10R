@@ -83,10 +83,20 @@ set(DX10R_PLUGIN_SOURCES
     # ParamSpecs: min/max/default の真実源 (pure C++)。plugin / WASM / tests が共有。
     ParamSpecs.h
     ParamSpecs.cpp
+    # ユーザープリセット save/load (ネイティブダイアログ) + エフェクト Copy/Paste の
+    # OS クリップボード (WebView null-origin 回避)。プラットフォーム別 .cpp/.mm は下で追加。
+    PresetFileDialog.h
+    SystemClipboard.h
     resources/resource.h
     ${DX10R_DSP_SOURCES}
     ${DX10R_EFFECT_SOURCES}
 )
+
+if(WIN32)
+    list(APPEND DX10R_PLUGIN_SOURCES PresetFileDialog_win.cpp SystemClipboard_win.cpp)
+elseif(APPLE)
+    list(APPEND DX10R_PLUGIN_SOURCES PresetFileDialog_mac.mm SystemClipboard_mac.mm)
+endif()
 
 iplug_add_plugin(DX10R
     SOURCES ${DX10R_PLUGIN_SOURCES}
