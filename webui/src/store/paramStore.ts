@@ -18,6 +18,8 @@ interface ParamStore {
   setManyFromHost: (values: Record<number, number>) => void
   /** UI 操作からの値更新。楽観的にストアへ反映しつつ C++ にも送る。 */
   setFromUI: (idx: number, normalized: number) => void
+  /** プリセット適用: 複数値を 1 回の store 更新で反映し、各値を C++ へ送る。 */
+  setManyFromUI: (values: Record<number, number>) => void
   beginGesture: (idx: number) => void
   endGesture: (idx: number) => void
 }
@@ -36,6 +38,11 @@ export const useParamStore = create<ParamStore>((set) => ({
   setFromUI: (idx, normalized) => {
     set((s) => ({ values: { ...s.values, [idx]: normalized } }))
     iplugAPI.setParamValue(idx, normalized)
+  },
+
+  setManyFromUI: (values) => {
+    set((s) => ({ values: { ...s.values, ...values } }))
+    for (const [idx, v] of Object.entries(values)) iplugAPI.setParamValue(Number(idx), v)
   },
 
   beginGesture: (idx) => iplugAPI.beginParamChange(idx),

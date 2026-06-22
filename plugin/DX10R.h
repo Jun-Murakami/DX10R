@@ -9,6 +9,7 @@
 
 #include "ParameterIDs.h"
 #include "dsp/VoiceManager.h"
+#include "dsp/effects/EffectsRack.h"
 
 using namespace iplug;
 
@@ -26,9 +27,41 @@ public:
   bool OnMessage(int msgTag, int ctrlTag, int dataSize, const void* pData) override;
   void OnParamChange(int paramIdx) override;
 
+  // Window / editor sizing. Overridden to fix Windows high-DPI WebView2 bounds
+  // (the WebView CSS viewport must equal the logical editor size at any DPI,
+  // else the UI is clipped on the right at >100% scale). Ported from Synth-80.
+  void* OpenWindow(void* pParent) override;
+  void CloseWindow() override;
+  void OnParentWindowResize(int width, int height) override;
+  bool ConstrainEditorResize(int& w, int& h) const override;
+
 private:
   void HandleMidiMsg(const IMidiMsg& msg);
+  // Dispatch an effect-chain IParam change (Type / generic / Bypass) to the rack.
+  void applyEffectParamChange(int paramIdx);
+#if defined(OS_WIN) && defined(AAX_API)
+  // Pro Tools / AAX views are 100% DPI physical px; pre-divide the bounds so
+  // iPlug2's internal GetScaleForHWND() multiplication lands on the PT view size.
+  void SetAAXWebViewBoundsPhysical(int widthPx, int heightPx);
+#endif
 
   dx10::dsp::VoiceManager mVoiceManager;
+  dx10::dsp::EffectsRack mEffectsRack;
   IMidiQueue mMidiQueue;
+
+  // --- Windows DPI / WebView sizing state ---
+  void* mNativeParent = nullptr; // parent HWND captured in OpenWindow
+#if defined(OS_WIN) && defined(APP_API)
+  // Correct only the iPlug2 ClientResize wrong-size right after OpenWindow at
+  // non-1.0 DPI; subsequent user drags are respected.
+  bool mDpiInitPending = false;
+#endif
+#if defined(OS_WIN) && defined(VST3_API)
+  // VST3 hosts treat getSize()/resizeView() values as physical px on Windows, so
+  // we keep the logical editor size separately for the WebView bounds.
+  int mVST3LogicalEditorWidth = dx10::editor_size::kDefaultWidth;
+  int mVST3LogicalEditorHeight = dx10::editor_size::kDefaultHeight;
+  bool mVST3HasLogicalEditorSize = false;
+  bool mInitialSizeCorrectionDone = false;
+#endif
 };

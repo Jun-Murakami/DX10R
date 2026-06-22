@@ -98,6 +98,13 @@ set(AAX_SDK_PATH "${IPLUG2_DIR}/Dependencies/IPlug/AAX_SDK" CACHE PATH "Path to 
 if(EXISTS "${AAX_SDK_PATH}/Interfaces/AAX.h")
     message(STATUS "AAX SDK found at: ${AAX_SDK_PATH}")
     set(BUILD_AAX ON)
+    # iPlug2's AAX.cmake reads AAX_SDK_DIR and only defaults it when undefined.
+    # When the AAX SDK is add_subdirectory()'d, its own CMakeLists overwrites the
+    # AAX_SDK_DIR *cache* entry with its binary dir (build/AAX_SDK), so on every
+    # RE-configure iPlug2 then looks at build/AAX_SDK, fails, and drops the AAX
+    # target. Pin AAX_SDK_DIR to the real source path with FORCE so detection is
+    # stable across reconfigures (not just the first clean configure).
+    set(AAX_SDK_DIR "${AAX_SDK_PATH}" CACHE PATH "AAX SDK source dir (iPlug2)" FORCE)
 else()
     message(STATUS "AAX SDK not found at: ${AAX_SDK_PATH} - AAX format will be disabled")
     set(BUILD_AAX OFF)

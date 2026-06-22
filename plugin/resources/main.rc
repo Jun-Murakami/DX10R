@@ -104,6 +104,17 @@ IDI_ICON1               ICON                    "DX10R.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
+// WebUI (RCDATA)
+//
+// The Vite single-file build output. Loaded in-memory via LoadHTML so WebView2's
+// virtual-host HTTP cache cannot serve a stale previous build. plugin/CMakeLists
+// sets OBJECT_DEPENDS on this file so `npm run build` forces a resource recompile.
+//
+IDR_INDEX_HTML          RCDATA                  "web\\index.html"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
 // Version
 //
 

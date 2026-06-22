@@ -57,7 +57,9 @@ mda DX10（2-op FM, OSS）を iPlug2 + WebView で現代風にリファインす
 - [x] オフライン DSP smoke test（`scratch/dsp_smoke.cpp`、g++ ビルド）で発音/Sustain/Release/finite を検証 PASS。Catch2 正式統合は Phase 5 のテスト基盤と合流
 - [x] **VST3 ビルド成功・engine 結線確認**（無音 → MIDI で 16 voice FM が鳴る）。`<cstddef>` 移植性バグを smoke test で発見・修正
 
-**Phase 1 コア完了。** 残: アンチエイリアス(オーバーサンプリング) / 物理単位の表示カーブ整備 / Catch2 正式統合（Phase 2・5 と合流）。
+- [x] **アンチエイリアス完了**: 2× オーバーサンプリング（`mFs = sr×2`、mda 係数は ifs から導出するので pitch/env/LFO はレート正）+ `dsp/Decimator2x.h`（31-tap Blackman 窓 sinc, fc=Fs/2 の 2:1 FIR デシメータ、mono）。master gain 平滑化もレート対応に。smoke test PASS、app/vst3/aax 再ビルド。
+
+**Phase 1 完了（アンチエイリアス含む）。** 残: 物理単位の表示カーブ整備 / Catch2 正式統合（Phase 5 と合流）/ オーバーサンプリング factor のユーザ選択（現状 2× 固定）。
 
 ## Phase 2 — WebUI 基盤 + パラメータブリッジ + ADSR UI
 
@@ -71,23 +73,36 @@ mda DX10（2-op FM, OSS）を iPlug2 + WebView で現代風にリファインす
 - [x] Vite singlefile → `plugin/resources/web/index.html`(586KB 自己完結) 出力。**VST3 再ビルドで新 UI 結線**。`DX10R_DEV_SERVER` 環境変数で DEBUG 時に Vite dev server(HMR) 切替可。
 - [ ] Vitest（paramStore / bridge）は後続で追加。**DAW 実機での UI 表示確認は未**（ヘッドレスのため要ユーザ確認）。
 
-**Phase 2 コア完了。** 残: 4 つの computed-display param(Coarse/Fine/Octave/LFO)の数値入力 round-trip（現状 0..1 編集。Synth80 の ParamRealValue channel で後日改善）/ Vitest / DAW 実機 UI 確認。
+- [x] **WebView ローディング & 高 DPI 対策**（実機検証済 2026-06-22）: index.html を RCDATA 埋め込み + in-memory `LoadHTML`(WebView2 仮想ホストキャッシュ回避)。Synth80 の高 DPI WebView バウンド補正(`GetWindowDpiScale`/`OnParentWindowResize` で client 物理 px÷scale→論理 px を `SetWebViewBounds`)を移植 → 1.5× で見切れ解消。AAX_SDK_DIR キャッシュ汚染も修正(FORCE 固定)。詳細はメモリ [[feedback_iplug2_webview_windows]]。
+
+**Phase 2 完了（DPI 含む）。** 残: 4 つの computed-display param(Coarse/Fine/Octave/LFO)の数値入力 round-trip（現状 0..1 編集。Synth80 の ParamRealValue channel で後日改善）/ Vitest / DAW 実機 UI 確認。
 
 ## Phase 3 — プリセット管理移植
 
 **ゴール**: `.dx10p`（フラット JSON）でプリセット保存/読込、32 種の mda ファクトリプリセットが付属。
 
-- [ ] Synth80 のプリセット機構を移植: `SerializeState`/`UnserializeState`、`PresetBar.tsx`、`bankStore.ts`、ネイティブファイルダイアログ、ビルド時埋め込み（`InitPatchEmbedded.h` / `FactoryPresetsEmbedded.h`）
-- [ ] 原典 32 プリセット（`mdaDX10.cpp` の `fillpatch(...)` テーブル）を `.dx10p` に変換。Sustain 追加に伴うマッピング（原典 16 値 → 新 param）を変換スクリプトで吸収。
-- [ ] ファクトリバンクを `docs/presets/` に配置しビルド時埋め込み
+**Phase 3a 完了（ファクトリプリセット in-UI）:**
+- [x] `scripts/gen-factory-presets.mjs`: mda ソースの `fillpatch(...)` を直接パースし、原典 16 値 → DX10R 18 param（Sustain=0 挿入 / Volume=0dB 正規化）へマッピング。**32 個の `.dx10p`**（`docs/presets/`、SOT、flat JSON）+ `webui/src/factory-presets.ts`（順序付きテーブル）を生成。
+- [x] WebUI `components/PresetBar.tsx`（prev / dropdown / next）をヘッダに配置。選択で 18 param を `setManyFromUI` で一括ロード（C++ へ SPVFUI 送信）。typecheck/build green。`LoadIndexHtml(__FILE__)` 経由なのでプラグイン再ビルド不要（リロードで反映）。
+
+**Phase 3b 残（ユーザープリセット & 配布埋め込み）:**
+- [ ] ユーザー `.dx10p` の save/load（Synth80 `PresetFileDialog_win.cpp`/`_mac.mm` 移植 + WebUI↔C++ メッセージ）。保存=現 18 param→ファイル、読込=ファイル→param + SPVFD。
+- [ ] 配布用にファクトリを C++ 埋め込み（`FactoryPresetsEmbedded.h`、CMake glob）+ iPlug2 native preset（host メニュー）連携は任意。
+- [ ] `SerializeState`/`OnRestoreState`（現状 iPlug2 が IParam 値を自動保存。bank 状態が要るなら拡張）
 
 ## Phase 4 — エフェクトチェーン移植
 
 **ゴール**: Synth80 と同等の 5 スロット直列エフェクトラックが動く。
 
-- [ ] `plugin/dsp/effects/`（`EffectBase` / `EffectsRack` + 11 種）を移植、`ParamSpecs` に 5 スロット × 9 param 追加
-- [ ] `webui/src/components/EffectsRack.tsx`（`@dnd-kit` 並べ替え）移植
-- [ ] Effect Chain Lock、per-slot Bypass、Type 切替時の default 一括書換え
+- [x] **Phase 4a (DSP) 完了**: `plugin/dsp/effects/`（`EffectBase`/`EffectsRack` + 11 種 + Hall/Plate/Room/ReverbCore、計 33 ファイル）を `dx10::dsp` に移植。EParams を 18..68 に拡張（5 slot × [Type+P1..P8+Bypass] + ChainLock、`kNumParams=69`）。`DX10R.cpp` で EffectsRack 結線（OnReset prepare/reset、ProcessBlock で synth 後段に per-sample process + per-block setTempo、OnParamChange dispatch + type 切替 reapply）。`scratch/fx_smoke.cpp`(g++) で全 11 種 finite/非無音・Off passthrough PASS。app+vst3 ビルド+deploy OK。`sizeof(EffectsRack)≈42MB`（事前生成バッファ、Synth80 同等）。
+- [x] **Phase 4b (WebUI) 完了**: `dx10r-effects.ts`（Synth80 metadata を verbatim 移植、全 11 種の per-knob ラベル/レンジ/curve/正規化 default/enum 選択肢）+ `components/EffectsRack.tsx`（5 タブ slot + 選択 slot エディタ: Type Select / Bypass / per-effect knob、`@dnd-kit` 並べ替え）。type 切替で per-effect default を `setManyFromUI` 一括書込み。`App.tsx` に全幅 Effects セクション追加。typecheck/biome/build green、headless 検証（overflow 無し・Reverb 選択で knob 出現）、`ui_fx.png` 確認。
+- [x] 既定ウィンドウを 1024×740 に拡大（FM + エフェクトラックが収まる）+ `EnableScroll(true)`（縮小時も到達可）。config.h と editor_size を同期。
+- [ ] 残: type 切替の soft-mute（クリック対策、Synth80 の requestSwapMute は未移植）/ Effect Chain Lock のプリセット連動（Phase 3b と合流）/ 計算表示 knob の数値入力 round-trip。
+
+- [x] **エフェクトラック UI を Synth-80 の LCD 風デザインに完全移植**（ユーザ要望）: `Knob.tsx` / `EffectKnob.tsx`（ロータリーノブ）+ LCD パネル `EffectsRack.tsx`（淡青グレー LCD + 濃紺インク、縦"EFFECT CHAIN"ラベル、5 スロット横チェーン + bypass ドット + ▼メニュー + → 矢印 + `@dnd-kit` 並べ替え、選択 slot のノブ編集エリア、EFFECT LOCK、Copy/Paste）。横スライダーではなくノブ + LCD（このセクションのみ意図的に Synth-80 流）。`effect-params.ts`(slot↔IParam helper) / `theme/surfaces.ts`(lcdPanelSx) 追加。i18n/flow-overlay/MIDI-learn/uiScale/variant は drop。全フォーマット再ビルド済。
+  - Copy/Paste は session 内のみ（null-origin WebView は OS クリップボード不可。C++ host-clipboard ブリッジは Phase 3b/将来）。
+
+**Phase 4 完了。** エフェクトチェーンがエンジン + LCD UI で end-to-end 動作。
 
 ## Phase 5 — WASM Web デモ
 

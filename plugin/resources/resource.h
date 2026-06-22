@@ -33,6 +33,10 @@
 #define ID_SHOW_BOUNDS                  40028
 #define ID_SCREENSHOT                   40029
 
+// WebUI bundle embedded as RCDATA (loaded in-memory to avoid WebView2's
+// virtual-host HTTP cache serving stale builds).
+#define IDR_INDEX_HTML                  50000
+
 // Next default values for new objects
 //
 #ifdef APSTUDIO_INVOKED

@@ -7,7 +7,14 @@ namespace dsp {
 
 void VoiceManager::setSampleRate(double sampleRate)
 {
-  mFs = sampleRate > 0.0 ? sampleRate : 44100.0;
+  const double base = sampleRate > 0.0 ? sampleRate : 44100.0;
+  // The FM engine renders oversampled; ALL mda coefficients derive from
+  // ifs = 1/mFs, so setting mFs to the oversampled rate keeps pitch, envelope
+  // times and LFO speed correct while the per-sample waveshaper/FM run 2x.
+  mFs = base * kOversample;
+  // ~20 ms master-gain smoothing time constant (rate-correct at mFs).
+  mGainSmoothCoef = 1.0 - std::exp(-1.0 / (0.02 * mFs));
+  mDecimator.prepare();
   update();
 }
 
@@ -19,6 +26,7 @@ void VoiceManager::reset()
   mPbend = 1.0f;
   mSustainPedal = false;
   mMasterGainSmoothed = mMasterGain;
+  mDecimator.reset();
 }
 
 void VoiceManager::setParam(int paramIdx, double normValue)
@@ -212,15 +220,25 @@ void VoiceManager::render(double* outL, double* outR, int start, int n)
 
   for (int i = start; i < end; ++i)
   {
-    mLfo.tick(mDlfo, mModwhl + mVibrato);
+    // Render kOversample (=2) mono sub-samples, then decimate 2:1 to band-limit
+    // the FM/waveshaper partials before they fold back as aliasing.
+    double sub0 = 0.0;
+    double sub1 = 0.0;
+    for (int os = 0; os < kOversample; ++os)
+    {
+      mLfo.tick(mDlfo, mModwhl + mVibrato);
 
-    float o = 0.0f;
-    for (int v = 0; v < kNumVoices; ++v)
-      o += mVoices[v].render(mLfo.mw, w, m);
+      float o = 0.0f;
+      for (int v = 0; v < kNumVoices; ++v)
+        o += mVoices[v].render(mLfo.mw, w, m);
 
-    // Smooth the master gain to avoid zipper noise (de-zip).
-    mMasterGainSmoothed += 0.001 * (mMasterGain - mMasterGainSmoothed);
-    const double s = static_cast<double>(o) * mMasterGainSmoothed;
+      // Smooth the master gain to avoid zipper noise (de-zip).
+      mMasterGainSmoothed += mGainSmoothCoef * (mMasterGain - mMasterGainSmoothed);
+      const double sub = static_cast<double>(o) * mMasterGainSmoothed;
+      (os == 0 ? sub0 : sub1) = sub;
+    }
+
+    const double s = mDecimator.process(sub0, sub1);
     outL[i] = s;
     outR[i] = s;
   }

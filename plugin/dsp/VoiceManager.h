@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../ParameterIDs.h"
+#include "Decimator2x.h"
 #include "Lfo.h"
 #include "Voice.h"
 
@@ -13,7 +14,8 @@ namespace dsp {
 class VoiceManager
 {
 public:
-  static constexpr int kNumVoices = 16; // DX10R: original mda DX10 was 8
+  static constexpr int kNumVoices = 16;  // DX10R: original mda DX10 was 8
+  static constexpr int kOversample = 2;  // 2x oversampling for anti-aliasing
 
   void setSampleRate(double sampleRate);
   void reset();
@@ -68,9 +70,11 @@ private:
   bool mSustainPedal = false;
   double mMasterGain = 1.0;
   double mMasterGainSmoothed = 1.0;
+  double mGainSmoothCoef = 0.0005; // per oversampled-sample one-pole coef (set by rate)
 
   Lfo mLfo;
   Voice mVoices[kNumVoices];
+  Decimator2x mDecimator; // 2:1 decimation of the oversampled mono render
 };
 
 } // namespace dsp

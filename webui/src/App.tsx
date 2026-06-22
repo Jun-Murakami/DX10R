@@ -1,7 +1,9 @@
 import { Box, CssBaseline, ThemeProvider, Typography } from '@mui/material'
 
 import { ADSRGraph } from './components/ADSRGraph'
+import { EffectsRack } from './components/EffectsRack'
 import { HorizontalParameter } from './components/HorizontalParameter'
+import { PresetBar } from './components/PresetBar'
 import { Section } from './components/Section'
 import { paramsForSection, SECTIONS } from './dx10r-params'
 import { darkTheme } from './theme'
@@ -20,7 +22,7 @@ export default function App() {
           gap: 1,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, px: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 0.5 }}>
           <Typography
             sx={{ fontWeight: 700, letterSpacing: 2, color: 'primary.main', fontSize: '1.2rem' }}
           >
@@ -29,6 +31,8 @@ export default function App() {
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             2-op FM
           </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <PresetBar />
         </Box>
 
         <Box
@@ -60,6 +64,10 @@ export default function App() {
             </Section>
           ))}
         </Box>
+
+        <Section title="Effects">
+          <EffectsRack />
+        </Section>
       </Box>
     </ThemeProvider>
   )

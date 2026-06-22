@@ -35,9 +35,11 @@
 #define PLUG_DOES_MPE 0
 #define PLUG_DOES_STATE_CHUNKS 0
 #define PLUG_HAS_UI 1
-// 暫定サイズ。Phase 2 の UI レイアウト確定時に webui の EDITOR_SIZE と揃える。
-#define PLUG_WIDTH 760
-#define PLUG_HEIGHT 620
+// FM セクション群 + 5 スロット エフェクトラックが既定で収まるサイズ。レイアウトは
+// レスポンシブ + 縦スクロール可なので、ウィンドウを縮めても操作可能。
+// ParameterIDs.h editor_size:: と必ず同期する（高 DPI バウンド補正が参照）。
+#define PLUG_WIDTH 1024
+#define PLUG_HEIGHT 740
 #define PLUG_FPS 60
 #define PLUG_SHARED_RESOURCES 0
 #define PLUG_HOST_RESIZE 1

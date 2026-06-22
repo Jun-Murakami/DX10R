@@ -45,8 +45,34 @@ endif()
 set(DX10R_DSP_SOURCES
     dsp/Voice.h
     dsp/Lfo.h
+    dsp/Decimator2x.h
     dsp/VoiceManager.h
     dsp/VoiceManager.cpp
+    # FM 波形整形等で使う共有数学ヘルパー (Synth80 から移植)。
+    dsp/FastMath.h
+    dsp/Simd.h
+)
+
+# 5 スロット直列エフェクトチェイン (Synth80 から移植、namespace dx10::dsp)。
+set(DX10R_EFFECT_SOURCES
+    dsp/effects/EffectBase.h
+    dsp/effects/EffectsRack.h
+    dsp/effects/EffectsRack.cpp
+    dsp/effects/SynthChorus.h        dsp/effects/SynthChorus.cpp
+    dsp/effects/StudioChorus.h       dsp/effects/StudioChorus.cpp
+    dsp/effects/DigitalChorus.h      dsp/effects/DigitalChorus.cpp
+    dsp/effects/Delay.h              dsp/effects/Delay.cpp
+    dsp/effects/Phaser.h             dsp/effects/Phaser.cpp
+    dsp/effects/Flanger.h            dsp/effects/Flanger.cpp
+    dsp/effects/EQ3Band.h            dsp/effects/EQ3Band.cpp
+    dsp/effects/Compressor.h         dsp/effects/Compressor.cpp
+    dsp/effects/Distortion.h         dsp/effects/Distortion.cpp
+    dsp/effects/Reverb.h             dsp/effects/Reverb.cpp
+    dsp/effects/ReverbCore.h
+    dsp/effects/HallCore.h           dsp/effects/HallCore.cpp
+    dsp/effects/PlateCore.h          dsp/effects/PlateCore.cpp
+    dsp/effects/RoomCore.h           dsp/effects/RoomCore.cpp
+    dsp/effects/PitchChorus.h        dsp/effects/PitchChorus.cpp
 )
 
 set(DX10R_PLUGIN_SOURCES
@@ -59,6 +85,7 @@ set(DX10R_PLUGIN_SOURCES
     ParamSpecs.cpp
     resources/resource.h
     ${DX10R_DSP_SOURCES}
+    ${DX10R_EFFECT_SOURCES}
 )
 
 iplug_add_plugin(DX10R
