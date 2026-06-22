@@ -1,22 +1,16 @@
 #pragma once
 
 // DX10R — mda DX10 (2-op FM) modern refit on iPlug2 + WebView.
-// Phase 0: minimal silent scaffold. The FM voice engine (ported from
-// docs/mda_DX10_src/mdaDX10.cpp into plugin/dsp/) arrives in Phase 1, and the
-// full parameter set moves to plugin/ParameterIDs.h + ParamSpecs.cpp.
+// Phase 1: the FM voice engine (plugin/dsp/, ported from
+// docs/mda_DX10_src/mdaDX10.cpp) is wired up; MIDI plays 16-voice polyphonic FM.
 
 #include "IPlug_include_in_plug_hdr.h"
+#include "IPlugMidi.h"
+
+#include "ParameterIDs.h"
+#include "dsp/VoiceManager.h"
 
 using namespace iplug;
-
-enum EParams
-{
-  // Placeholder so iPlug2 has a valid parameter set during Phase 0.
-  // Replaced by the real DX10R parameters (carrier ADSR, modulator env,
-  // ratio, tone, mod, master) in Phase 1 via ParameterIDs.h.
-  kParamVolume = 0,
-  kNumParams
-};
 
 class DX10R final : public Plugin
 {
@@ -31,4 +25,10 @@ public:
 
   bool OnMessage(int msgTag, int ctrlTag, int dataSize, const void* pData) override;
   void OnParamChange(int paramIdx) override;
+
+private:
+  void HandleMidiMsg(const IMidiMsg& msg);
+
+  dx10::dsp::VoiceManager mVoiceManager;
+  IMidiQueue mMidiQueue;
 };

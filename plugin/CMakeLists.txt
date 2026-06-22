@@ -40,13 +40,25 @@ if(APPLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/main.rc")
     endif()
 endif()
 
-# Phase 1 以降で plugin/dsp/ の FM エンジン (Voice / Envelope / LFO / VoiceManager)、
-# ParameterIDs.h / ParamSpecs.{h,cpp} を SOURCES に追加していく。
+# DSP エンジン (mda DX10 を移植した 2-op FM)。Voice / Lfo はヘッダオンリ、
+# VoiceManager に係数導出 (mda update()) と MIDI / レンダリングを集約。
+set(DX10R_DSP_SOURCES
+    dsp/Voice.h
+    dsp/Lfo.h
+    dsp/VoiceManager.h
+    dsp/VoiceManager.cpp
+)
+
 set(DX10R_PLUGIN_SOURCES
     DX10R.cpp
     DX10R.h
     config.h
+    ParameterIDs.h
+    # ParamSpecs: min/max/default の真実源 (pure C++)。plugin / WASM / tests が共有。
+    ParamSpecs.h
+    ParamSpecs.cpp
     resources/resource.h
+    ${DX10R_DSP_SOURCES}
 )
 
 iplug_add_plugin(DX10R

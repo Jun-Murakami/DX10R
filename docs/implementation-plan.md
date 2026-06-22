@@ -49,22 +49,29 @@ mda DX10（2-op FM, OSS）を iPlug2 + WebView で現代風にリファインす
 
 **ゴール**: MIDI で 16 voice の 2-op FM が鳴る。原典の音色を再現し、Sustain と de-zip を追加。
 
-- [ ] `plugin/dsp/` モジュール: `Voice`（2-op: carrier + modulator, 5 次正弦近似 + 倍音 "rich"）/ `Envelope`（carrier A/D/S/R + modulator env）/ `Lfo`（vibrato 用サイン）/ `VoiceManager`（16 voice 割当、最も静かな voice を奪う原典ロジック）
-- [ ] 原典 `update()` の係数導出（`tune` / `rati` / `ratf` / `ratio` / `catt` / `cdec` / `crel` / `mdec` / `mrel` / `rich` / `modmix` / `dlfo`）を移植。Sustain stage を carrier env に追加。
-- [ ] de-zip（パラメータ平滑化）と波形整形のアンチエイリアス（5 次正弦近似のナイキスト付近対策）
-- [ ] MIDI: note on/off、velocity、pitch bend、mod wheel、sustain CC、volume CC、all-notes-off（原典 `processEvents()` 準拠）
-- [ ] `ParamSpecs.cpp` に全 param 定義、`CalibratedShapes.h` に Octave / Ratio / Fine Tune などのカーブ
-- [ ] Catch2 ユニットテスト（envelope / カーブ / plugin↔WASM 等価）
+- [x] `plugin/dsp/` モジュール: `Voice.h`（2-op: carrier + modulator, 5 次正弦近似 + 倍音 "rich"。env はインライン）/ `Lfo.h`（vibrato 用サイン、control-rate 100 sample）/ `VoiceManager.{h,cpp}`（16 voice 割当、最も静かな voice を奪う原典ロジック + 係数導出 + MIDI）
+- [x] 原典 `update()` の係数導出（`tune` / `rati` / `ratf` / `ratio` / `catt` / `cdec` / `crel` / `mdec` / `mrel` / `rich` / `modmix` / `dlfo`）を忠実移植。**carrier env を sustain target 方式に一般化**（Sustain=0 で原典の減衰挙動に一致）
+- [x] de-zip（master gain の one-pole 平滑化）。**アンチエイリアス（波形整形のオーバーサンプリング）は Phase 1 残作業**（UI で試聴できる Phase 2 後に着手予定）
+- [x] MIDI: note on/off、velocity、pitch bend、mod wheel(CC1)、sustain(CC64)、volume(CC7)、panic(CC≥0x7A)。`IMidiQueue` でサンプル精度ディスパッチ
+- [x] `ParamSpecs.{h,cpp}`（SSoT、pure C++）に全 18 param 定義（mda 16 + Sustain + Master）。デフォルトは "Bright E.Piano"。`CalibratedShapes.h`(物理単位カーブ) は表示整備時に追加
+- [x] オフライン DSP smoke test（`scratch/dsp_smoke.cpp`、g++ ビルド）で発音/Sustain/Release/finite を検証 PASS。Catch2 正式統合は Phase 5 のテスト基盤と合流
+- [x] **VST3 ビルド成功・engine 結線確認**（無音 → MIDI で 16 voice FM が鳴る）。`<cstddef>` 移植性バグを smoke test で発見・修正
+
+**Phase 1 コア完了。** 残: アンチエイリアス(オーバーサンプリング) / 物理単位の表示カーブ整備 / Catch2 正式統合（Phase 2・5 と合流）。
 
 ## Phase 2 — WebUI 基盤 + パラメータブリッジ + ADSR UI
 
 **ゴール**: 全パラメータが横スライダー + 数値入力で操作でき、ADSR グラフが動く。
 
-- [ ] `webui/` を Synth80 から移植（Vite + React 19 + MUI v9 + Zustand + Biome、`bridge/iplug-bridge.ts`、`store/paramStore.ts`、`theme/`、dev-mock）
-- [ ] ZeroComp `HorizontalParameter.tsx` を移植し、`useJuceSliderValue` → Synth80 の `paramStore`（`useParamValue` / `useParamGesture`）に差し替え。`block-host-shortcuts` / 微調整修飾キー（Ctrl/Cmd/Shift）/ ホイール / 数値入力ドラッグを維持。
-- [ ] Synth80 ADSR UI（`ADSRGraph.tsx` / `EnvelopePanel.tsx`）を移植し carrier A/D/S/R + modulator env に接続
-- [ ] メイン UI レイアウト（セクション分け: Amp Env / Modulator / Ratio / Tone / Mod / Master）
-- [ ] paramStore ↔ host 同期・bridge JSON 整形の Vitest
+- [x] `webui/` 構築（Vite + React 19 + MUI v9 + Zustand + Biome、`bridge/iplug-bridge.ts`、`store/paramStore.ts`、`theme/`、`dev-mock.ts`）。fork で作成、`npm install`/`build`/`typecheck`/`biome` 全 green。
+- [x] ZeroComp `HorizontalParameter.tsx` を移植しデータ層を `paramStore`（`useParam` + `setFromUI` + gesture）に差し替え。`block-host-shortcuts` / 微調整(Ctrl/Cmd/Shift) / ホイール / 数値入力ドラッグ維持。
+- [x] bridge プロトコルを iPlug2 C++ 契約(`IPlugWebViewEditorDelegate.h`: `msg`/`paramIdx`/`value`, SPVFUI/BPCFUI/EPCFUI)と照合・一致確認。受信は `window.SPVFD`→`setFromHost`。C++ 側ハンドシェイク不要(base が OnWebContentLoaded で schema+値を push)。
+- [x] ADSR graph（`ADSRGraph.tsx`）を carrier A/D/S/R に接続。Amp Env セクションに配置。
+- [x] メイン UI レイアウト（Amp Env / Modulator / FM Ratio / Tone / LFO / Master）+ mda 準拠の表示(ratio/cents/Hz/dB/%)。`dx10r-params.ts` が param metadata。
+- [x] Vite singlefile → `plugin/resources/web/index.html`(586KB 自己完結) 出力。**VST3 再ビルドで新 UI 結線**。`DX10R_DEV_SERVER` 環境変数で DEBUG 時に Vite dev server(HMR) 切替可。
+- [ ] Vitest（paramStore / bridge）は後続で追加。**DAW 実機での UI 表示確認は未**（ヘッドレスのため要ユーザ確認）。
+
+**Phase 2 コア完了。** 残: 4 つの computed-display param(Coarse/Fine/Octave/LFO)の数値入力 round-trip（現状 0..1 編集。Synth80 の ParamRealValue channel で後日改善）/ Vitest / DAW 実機 UI 確認。
 
 ## Phase 3 — プリセット管理移植
 
